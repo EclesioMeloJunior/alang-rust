@@ -9,7 +9,8 @@ fn main() {
         if bytes_read > 0 {
             match lexer::extract_token_stream(line) {
                 Ok(tokens) => {
-                    parser::parse(tokens).unwrap();
+                    let exp_tree = parser::parse(tokens).unwrap();
+                    println!("{:?}", exp_tree);
                 }
                 Err(e) => println!("{:?}", e),
             }
