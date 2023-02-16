@@ -8,6 +8,8 @@ pub enum Operator {
     Minus,
     Multiplication,
     Division,
+
+    Negative,
 }
 
 pub struct NotAnOperatorError(Token);
@@ -29,13 +31,17 @@ impl PartialOrd for Operator {
         let ordering = match self {
             Operator::Plus | Operator::Minus => match other {
                 Operator::Sentinel => Ordering::Greater,
-                Operator::Multiplication | Operator::Division => Ordering::Less,
+                Operator::Multiplication | Operator::Division | Operator::Negative => {
+                    Ordering::Less
+                }
                 _ => Ordering::Equal,
             },
             Operator::Multiplication | Operator::Division => match other {
                 Operator::Sentinel | Operator::Minus | Operator::Plus => Ordering::Greater,
+                Operator::Negative => Ordering::Less,
                 _ => Ordering::Equal,
             },
+            Operator::Negative => Ordering::Greater,
             Operator::Sentinel => Ordering::Less,
         };
 
@@ -43,7 +49,7 @@ impl PartialOrd for Operator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Node {
     I32(i32),
     UnaryExpr {

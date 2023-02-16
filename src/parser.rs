@@ -125,8 +125,8 @@ fn parse_stmt(
                 }
             }
             Token::Minus => {
-                todo!("should implement unary with the negative Token instead of Minus Token");
                 token_stream.pop();
+                operators_stack.push(Operator::Negative);
                 parse_stmt(token_stream, operators_stack, operands_stack)?;
                 Ok(())
             }
@@ -148,10 +148,6 @@ fn push_operator(
             if *top_stack_operator > op {
                 pop_operator(operators_stack, operands_stack)
             } else {
-                println!(
-                    "top operator: {:?} is not greater than: {:?}",
-                    *top_stack_operator, op
-                );
                 break;
             }
         } else {
@@ -175,6 +171,14 @@ fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<No
                     rhs: Box::new(rhs),
                 })
             }
+            Operator::Negative => {
+                let unary_expression = Node::UnaryExpr {
+                    op: operators_stack.pop().unwrap(),
+                    inner: Box::new(operands_stack.pop().unwrap()),
+                };
+
+                operands_stack.push(unary_expression);
+            }
             _ => todo!("should implement unary operations"),
         },
         None => {}
@@ -182,8 +186,78 @@ fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<No
 }
 
 mod tests {
-    use super::*;
+    use crate::{
+        ast::{Node, Operator},
+        parser::parse,
+    };
 
     #[test]
-    fn test_parse() {}
+    fn test_parser() {
+        use crate::lexer::Token;
+        let tokens_tests: Vec<Vec<Token>> = vec![
+            vec![Token::I32(1), Token::Plus, Token::I32(1)],
+            vec![
+                Token::I32(1),
+                Token::Plus,
+                Token::I32(1),
+                Token::Star,
+                Token::I32(2),
+            ],
+            // should parse the unary expression
+            vec![
+                Token::Minus,
+                Token::I32(1),
+                Token::Plus,
+                Token::I32(1),
+                Token::Slash,
+                Token::I32(2),
+            ],
+            vec![Token::Minus, Token::I32(1), Token::Minus, Token::I32(1)],
+        ];
+
+        let expected_outputs: Vec<Node> = vec![
+            Node::BinaryExpr {
+                op: Operator::Plus,
+                lhs: Box::new(Node::I32(1)),
+                rhs: Box::new(Node::I32(1)),
+            },
+            Node::BinaryExpr {
+                op: Operator::Plus,
+                lhs: Box::new(Node::I32(1)),
+                rhs: Box::new(Node::BinaryExpr {
+                    op: Operator::Multiplication,
+                    lhs: Box::new(Node::I32(1)),
+                    rhs: Box::new(Node::I32(2)),
+                }),
+            },
+            Node::BinaryExpr {
+                op: Operator::Plus,
+                lhs: Box::new(Node::UnaryExpr {
+                    op: Operator::Negative,
+                    inner: Box::new(Node::I32(1)),
+                }),
+                rhs: Box::new(Node::BinaryExpr {
+                    op: Operator::Division,
+                    lhs: Box::new(Node::I32(1)),
+                    rhs: Box::new(Node::I32(2)),
+                }),
+            },
+            Node::BinaryExpr {
+                op: Operator::Minus,
+                lhs: Box::new(Node::UnaryExpr {
+                    op: Operator::Negative,
+                    inner: Box::new(Node::I32(1)),
+                }),
+                rhs: Box::new(Node::I32(1)),
+            },
+        ];
+
+        for idx in 0..tokens_tests.len() {
+            let tokens_to_test = tokens_tests[idx].clone();
+            let expected_ast = expected_outputs[idx].clone();
+
+            let output_ast = parse(tokens_to_test).unwrap();
+            assert_eq!(output_ast, expected_ast);
+        }
+    }
 }

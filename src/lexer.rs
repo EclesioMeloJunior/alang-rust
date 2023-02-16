@@ -69,10 +69,39 @@ mod tests {
 
     #[test]
     fn test_extract_token_stream() {
-        let input = "1 + 1";
-        let output = extract_token_stream(input.to_string()).unwrap();
+        let tests: Vec<&'static str> = vec!["1 + 1", "-1 + 1", "5 * 1 + 1", "5 * 1 / 1", "(5 + 5)"];
+        let expectations: Vec<Vec<Token>> = vec![
+            vec![Token::I32(1), Token::Plus, Token::I32(1)],
+            vec![Token::Minus, Token::I32(1), Token::Plus, Token::I32(1)],
+            vec![
+                Token::I32(5),
+                Token::Star,
+                Token::I32(1),
+                Token::Plus,
+                Token::I32(1),
+            ],
+            vec![
+                Token::I32(5),
+                Token::Star,
+                Token::I32(1),
+                Token::Slash,
+                Token::I32(1),
+            ],
+            vec![
+                Token::OpenParen,
+                Token::I32(5),
+                Token::Plus,
+                Token::I32(5),
+                Token::CloseParen,
+            ],
+        ];
 
-        let expected = vec![Token::I32(1), Token::Plus, Token::I32(1)];
-        assert_eq!(output, expected);
+        for idx in 0..tests.len() {
+            let input = tests[idx];
+            let expected = expectations[idx].clone();
+
+            let output = extract_token_stream(input.to_string()).unwrap();
+            assert_eq!(output, expected);
+        }
     }
 }
