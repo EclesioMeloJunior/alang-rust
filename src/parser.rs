@@ -195,6 +195,7 @@ fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<No
 }
 
 mod tests {
+    #[allow(unused_imports)]
     use crate::{
         ast::{Node, Operator},
         parser::parse,

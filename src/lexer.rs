@@ -1,4 +1,3 @@
-use crate::ast::{Node, Operator};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -65,7 +64,8 @@ pub fn extract_token_stream(line: String) -> Result<Vec<Token>, LexerError> {
 }
 
 mod tests {
-    use super::*;
+    #[allow(unused_imports)]
+    use super::{extract_token_stream, Token};
 
     #[test]
     fn test_extract_token_stream() {
