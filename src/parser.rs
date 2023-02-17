@@ -8,6 +8,7 @@ pub enum ParserError {
     ExpectedClosingParent,
     UnexpectedToken(Token),
     TokenStreamNotEmpty,
+    FailedToParseAllOperators,
 }
 
 impl fmt::Display for ParserError {
@@ -17,6 +18,7 @@ impl fmt::Display for ParserError {
             ParserError::ExpectedClosingParent => write!(f, "expected closing parent"),
             ParserError::UnexpectedToken(t) => write!(f, "unexpected token: {:?}", t),
             ParserError::TokenStreamNotEmpty => write!(f, "token stream not empty"),
+            ParserError::FailedToParseAllOperators => write!(f, "failed to parse all operators"),
         }
     }
 }
@@ -48,7 +50,9 @@ pub fn parse(token_stream: Vec<Token>) -> Result<Node, ParserError> {
         return Err(ParserError::TokenStreamNotEmpty);
     }
 
-    println!("operands stack len: {}", operands_stack.len());
+    if operands_stack.len() != 1 {
+        return Err(ParserError::FailedToParseAllOperators);
+    }
 
     Ok(operands_stack.pop().unwrap())
 }
@@ -63,6 +67,9 @@ fn parse_expression(
     loop {
         if let Some(next_tok) = token_stream.last() {
             match next_tok {
+                // when we reach a closing parent we just return since
+                // it is possible we are inside an open paren iteration
+                Token::CloseParen => break,
                 Token::Plus | Token::Minus | Token::Star | Token::Slash => {
                     let operator = match Operator::try_from(*next_tok) {
                         Ok(operator) => operator,
@@ -81,6 +88,11 @@ fn parse_expression(
         }
     }
 
+    rewind_operands(operators_stack, operands_stack);
+    Ok(())
+}
+
+fn rewind_operands(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<Node>) {
     loop {
         let top_stack_operator = operators_stack.last().unwrap();
         if *top_stack_operator == Operator::Sentinel {
@@ -89,8 +101,6 @@ fn parse_expression(
 
         pop_operator(operators_stack, operands_stack);
     }
-
-    Ok(())
 }
 
 fn parse_stmt(
@@ -111,17 +121,16 @@ fn parse_stmt(
                 parse_expression(token_stream, operators_stack, operands_stack)?;
 
                 // expect we end with a closing parenthesis
-                match token_stream.last() {
-                    Some(end_tok) => {
-                        if *end_tok != Token::CloseParen {
-                            return Err(ParserError::ExpectedClosingParent);
-                        }
-
-                        token_stream.pop();
-                        operators_stack.pop();
-                        Ok(())
+                if let Some(end_token) = token_stream.last() {
+                    if *end_token != Token::CloseParen {
+                        return Err(ParserError::ExpectedClosingParent);
                     }
-                    None => Err(ParserError::UnexpectedEnd),
+
+                    token_stream.pop();
+                    operators_stack.pop();
+                    return Ok(());
+                } else {
+                    return Err(ParserError::ExpectedClosingParent);
                 }
             }
             Token::Minus => {
@@ -213,6 +222,15 @@ mod tests {
                 Token::I32(2),
             ],
             vec![Token::Minus, Token::I32(1), Token::Minus, Token::I32(1)],
+            vec![
+                Token::I32(10),
+                Token::Slash,
+                Token::OpenParen,
+                Token::I32(90),
+                Token::Plus,
+                Token::I32(8),
+                Token::CloseParen,
+            ],
         ];
 
         let expected_outputs: Vec<Node> = vec![
@@ -249,6 +267,15 @@ mod tests {
                     inner: Box::new(Node::I32(1)),
                 }),
                 rhs: Box::new(Node::I32(1)),
+            },
+            Node::BinaryExpr {
+                op: Operator::Division,
+                lhs: Box::new(Node::I32(10)),
+                rhs: Box::new(Node::BinaryExpr {
+                    op: Operator::Plus,
+                    lhs: Box::new(Node::I32(90)),
+                    rhs: Box::new(Node::I32(8)),
+                }),
             },
         ];
 
