@@ -70,7 +70,7 @@ fn parse_expression(
                 // when we reach a closing parent we just return since
                 // it is possible we are inside an open paren iteration
                 Token::CloseParen => break,
-                Token::Plus | Token::Minus | Token::Star | Token::Slash => {
+                Token::Plus | Token::Minus | Token::Star | Token::Slash | Token::Caret => {
                     let operator = match Operator::try_from(*next_tok) {
                         Ok(operator) => operator,
                         _ => return Err(ParserError::UnexpectedToken(*next_tok)),
@@ -170,7 +170,11 @@ fn push_operator(
 fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<ASTNode>) {
     match operators_stack.last() {
         Some(value) => match *value {
-            Operator::Plus | Operator::Minus | Operator::Multiplication | Operator::Division => {
+            Operator::Plus
+            | Operator::Minus
+            | Operator::Multiplication
+            | Operator::Division
+            | Operator::Exponential => {
                 let rhs = operands_stack.pop().unwrap();
                 let lhs = operands_stack.pop().unwrap();
 
@@ -188,7 +192,7 @@ fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<AS
 
                 operands_stack.push(unary_expression);
             }
-            _ => todo!("should implement unary operations"),
+            _ => todo!("return an error if the popped operator is not supported"),
         },
         None => {}
     }
@@ -232,6 +236,7 @@ mod tests {
                 Token::I32(8),
                 Token::CloseParen,
             ],
+            vec![Token::I32(2), Token::Caret, Token::I32(2)],
         ];
 
         let expected_outputs: Vec<ASTNode> = vec![
@@ -277,6 +282,11 @@ mod tests {
                     lhs: Box::new(ASTNode::I32(90)),
                     rhs: Box::new(ASTNode::I32(8)),
                 }),
+            },
+            ASTNode::BinaryExpr {
+                op: Operator::Exponential,
+                lhs: Box::new(ASTNode::I32(2)),
+                rhs: Box::new(ASTNode::I32(2)),
             },
         ];
 

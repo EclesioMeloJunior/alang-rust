@@ -31,6 +31,11 @@ fn evaluate_expression(expression_tree: ASTNode) -> Result<i32, EvaluateError> {
             Operator::Division => {
                 Ok(evaluate_expression(*lhs).unwrap() / evaluate_expression(*rhs).unwrap())
             }
+            Operator::Exponential => {
+                let lhs = evaluate_expression(*lhs).unwrap();
+                let rhs = evaluate_expression(*rhs).unwrap();
+                Ok(lhs.pow(rhs as u32))
+            }
             _ => Err(EvaluateError::UnexpectedBinaryOperator),
         },
     }

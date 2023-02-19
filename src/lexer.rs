@@ -11,6 +11,8 @@ pub enum Token {
 
     OpenParen,
     CloseParen,
+
+    Caret,
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +41,7 @@ pub fn extract_token_stream(line: String) -> Result<Vec<Token>, LexerError> {
             '/' => tokens.push(Token::Slash),
             '(' => tokens.push(Token::OpenParen),
             ')' => tokens.push(Token::CloseParen),
+            '^' => tokens.push(Token::Caret),
             _ => {
                 if current.is_numeric() {
                     let mut numbers_in_seq = vec![current.to_string()];
@@ -69,7 +72,14 @@ mod tests {
 
     #[test]
     fn test_extract_token_stream() {
-        let tests: Vec<&'static str> = vec!["1 + 1", "-1 + 1", "5 * 1 + 1", "5 * 1 / 1", "(5 + 5)"];
+        let tests: Vec<&'static str> = vec![
+            "1 + 1",
+            "-1 + 1",
+            "5 * 1 + 1",
+            "5 * 1 / 1",
+            "(5 + 5)",
+            "2 ^ 2",
+        ];
         let expectations: Vec<Vec<Token>> = vec![
             vec![Token::I32(1), Token::Plus, Token::I32(1)],
             vec![Token::Minus, Token::I32(1), Token::Plus, Token::I32(1)],
@@ -94,6 +104,7 @@ mod tests {
                 Token::I32(5),
                 Token::CloseParen,
             ],
+            vec![Token::I32(2), Token::Caret, Token::I32(2)],
         ];
 
         for idx in 0..tests.len() {

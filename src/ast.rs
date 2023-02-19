@@ -10,6 +10,7 @@ pub enum Operator {
     Division,
 
     Negative,
+    Exponential,
 }
 
 pub struct NotAnOperatorError(Token);
@@ -21,6 +22,7 @@ impl TryFrom<Token> for Operator {
             Token::Minus => Ok(Operator::Minus),
             Token::Star => Ok(Operator::Multiplication),
             Token::Slash => Ok(Operator::Division),
+            Token::Caret => Ok(Operator::Exponential),
             _ => Err(NotAnOperatorError(value)),
         }
     }
@@ -31,17 +33,22 @@ impl PartialOrd for Operator {
         let ordering = match self {
             Operator::Plus | Operator::Minus => match other {
                 Operator::Sentinel => Ordering::Greater,
-                Operator::Multiplication | Operator::Division | Operator::Negative => {
-                    Ordering::Less
-                }
+                Operator::Multiplication
+                | Operator::Division
+                | Operator::Negative
+                | Operator::Exponential => Ordering::Less,
                 _ => Ordering::Equal,
             },
             Operator::Multiplication | Operator::Division => match other {
                 Operator::Sentinel | Operator::Minus | Operator::Plus => Ordering::Greater,
-                Operator::Negative => Ordering::Less,
+                Operator::Negative | Operator::Exponential => Ordering::Less,
                 _ => Ordering::Equal,
             },
-            Operator::Negative => Ordering::Greater,
+            Operator::Negative => match other {
+                Operator::Exponential => Ordering::Less,
+                _ => Ordering::Greater,
+            },
+            Operator::Exponential => Ordering::Greater,
             Operator::Sentinel => Ordering::Less,
         };
 
