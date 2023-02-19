@@ -1,4 +1,4 @@
-use crate::ast::{Node, Operator};
+use crate::ast::{ASTNode, Operator};
 use crate::lexer::Token;
 use std::fmt;
 
@@ -34,7 +34,7 @@ impl fmt::Display for ParserError {
  * where `v` is a terminal
  */
 
-pub fn parse(token_stream: Vec<Token>) -> Result<Node, ParserError> {
+pub fn parse(token_stream: Vec<Token>) -> Result<ASTNode, ParserError> {
     let mut token_stream = token_stream.clone();
 
     // reverse the token stream so I can use pop to drain
@@ -42,7 +42,7 @@ pub fn parse(token_stream: Vec<Token>) -> Result<Node, ParserError> {
     token_stream.reverse();
 
     let mut operators_stack: Vec<Operator> = vec![Operator::Sentinel];
-    let mut operands_stack: Vec<Node> = vec![];
+    let mut operands_stack: Vec<ASTNode> = vec![];
 
     parse_expression(&mut token_stream, &mut operators_stack, &mut operands_stack)?;
 
@@ -60,7 +60,7 @@ pub fn parse(token_stream: Vec<Token>) -> Result<Node, ParserError> {
 fn parse_expression(
     token_stream: &mut Vec<Token>,
     operators_stack: &mut Vec<Operator>,
-    operands_stack: &mut Vec<Node>,
+    operands_stack: &mut Vec<ASTNode>,
 ) -> Result<(), ParserError> {
     parse_stmt(token_stream, operators_stack, operands_stack)?;
 
@@ -92,7 +92,7 @@ fn parse_expression(
     Ok(())
 }
 
-fn rewind_operands(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<Node>) {
+fn rewind_operands(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<ASTNode>) {
     loop {
         let top_stack_operator = operators_stack.last().unwrap();
         if *top_stack_operator == Operator::Sentinel {
@@ -106,12 +106,12 @@ fn rewind_operands(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec
 fn parse_stmt(
     token_stream: &mut Vec<Token>,
     operators_stack: &mut Vec<Operator>,
-    operands_stack: &mut Vec<Node>,
+    operands_stack: &mut Vec<ASTNode>,
 ) -> Result<(), ParserError> {
     match token_stream.last() {
         Some(current_tok) => match current_tok {
             Token::I32(terminal_value) => {
-                operands_stack.push(Node::I32(*terminal_value));
+                operands_stack.push(ASTNode::I32(*terminal_value));
                 token_stream.pop().unwrap();
                 Ok(())
             }
@@ -148,7 +148,7 @@ fn parse_stmt(
 fn push_operator(
     op: Operator,
     operators_stack: &mut Vec<Operator>,
-    operands_stack: &mut Vec<Node>,
+    operands_stack: &mut Vec<ASTNode>,
 ) {
     loop {
         // retrieve the top operator in the stack and check
@@ -167,21 +167,21 @@ fn push_operator(
     operators_stack.push(op);
 }
 
-fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<Node>) {
+fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<ASTNode>) {
     match operators_stack.last() {
         Some(value) => match *value {
             Operator::Plus | Operator::Minus | Operator::Multiplication | Operator::Division => {
                 let rhs = operands_stack.pop().unwrap();
                 let lhs = operands_stack.pop().unwrap();
 
-                operands_stack.push(Node::BinaryExpr {
+                operands_stack.push(ASTNode::BinaryExpr {
                     op: operators_stack.pop().unwrap(),
                     lhs: Box::new(lhs),
                     rhs: Box::new(rhs),
                 })
             }
             Operator::Negative => {
-                let unary_expression = Node::UnaryExpr {
+                let unary_expression = ASTNode::UnaryExpr {
                     op: operators_stack.pop().unwrap(),
                     inner: Box::new(operands_stack.pop().unwrap()),
                 };
@@ -197,7 +197,7 @@ fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<No
 mod tests {
     #[allow(unused_imports)]
     use crate::{
-        ast::{Node, Operator},
+        ast::{ASTNode, Operator},
         parser::parse,
     };
 
@@ -234,48 +234,48 @@ mod tests {
             ],
         ];
 
-        let expected_outputs: Vec<Node> = vec![
-            Node::BinaryExpr {
+        let expected_outputs: Vec<ASTNode> = vec![
+            ASTNode::BinaryExpr {
                 op: Operator::Plus,
-                lhs: Box::new(Node::I32(1)),
-                rhs: Box::new(Node::I32(1)),
+                lhs: Box::new(ASTNode::I32(1)),
+                rhs: Box::new(ASTNode::I32(1)),
             },
-            Node::BinaryExpr {
+            ASTNode::BinaryExpr {
                 op: Operator::Plus,
-                lhs: Box::new(Node::I32(1)),
-                rhs: Box::new(Node::BinaryExpr {
+                lhs: Box::new(ASTNode::I32(1)),
+                rhs: Box::new(ASTNode::BinaryExpr {
                     op: Operator::Multiplication,
-                    lhs: Box::new(Node::I32(1)),
-                    rhs: Box::new(Node::I32(2)),
+                    lhs: Box::new(ASTNode::I32(1)),
+                    rhs: Box::new(ASTNode::I32(2)),
                 }),
             },
-            Node::BinaryExpr {
+            ASTNode::BinaryExpr {
                 op: Operator::Plus,
-                lhs: Box::new(Node::UnaryExpr {
+                lhs: Box::new(ASTNode::UnaryExpr {
                     op: Operator::Negative,
-                    inner: Box::new(Node::I32(1)),
+                    inner: Box::new(ASTNode::I32(1)),
                 }),
-                rhs: Box::new(Node::BinaryExpr {
+                rhs: Box::new(ASTNode::BinaryExpr {
                     op: Operator::Division,
-                    lhs: Box::new(Node::I32(1)),
-                    rhs: Box::new(Node::I32(2)),
+                    lhs: Box::new(ASTNode::I32(1)),
+                    rhs: Box::new(ASTNode::I32(2)),
                 }),
             },
-            Node::BinaryExpr {
+            ASTNode::BinaryExpr {
                 op: Operator::Minus,
-                lhs: Box::new(Node::UnaryExpr {
+                lhs: Box::new(ASTNode::UnaryExpr {
                     op: Operator::Negative,
-                    inner: Box::new(Node::I32(1)),
+                    inner: Box::new(ASTNode::I32(1)),
                 }),
-                rhs: Box::new(Node::I32(1)),
+                rhs: Box::new(ASTNode::I32(1)),
             },
-            Node::BinaryExpr {
+            ASTNode::BinaryExpr {
                 op: Operator::Division,
-                lhs: Box::new(Node::I32(10)),
-                rhs: Box::new(Node::BinaryExpr {
+                lhs: Box::new(ASTNode::I32(10)),
+                rhs: Box::new(ASTNode::BinaryExpr {
                     op: Operator::Plus,
-                    lhs: Box::new(Node::I32(90)),
-                    rhs: Box::new(Node::I32(8)),
+                    lhs: Box::new(ASTNode::I32(90)),
+                    rhs: Box::new(ASTNode::I32(8)),
                 }),
             },
         ];
