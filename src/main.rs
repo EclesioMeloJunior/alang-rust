@@ -1,4 +1,5 @@
 mod ast;
+mod eval;
 mod lexer;
 mod parser;
 
@@ -10,7 +11,8 @@ fn main() {
             match lexer::extract_token_stream(line) {
                 Ok(tokens) => {
                     let exp_tree = parser::parse(tokens).unwrap();
-                    println!("{:?}", exp_tree);
+                    eval::evaluate(exp_tree);
+                    //println!("{:?}", exp_tree);
                 }
                 Err(e) => println!("{:?}", e),
             }
