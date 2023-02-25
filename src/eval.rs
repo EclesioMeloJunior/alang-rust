@@ -16,7 +16,31 @@ impl fmt::Display for NumericObject {
     }
 }
 
+macro_rules! check_div_or_err {
+    ($lhs:ident, $rhs:ident) => {
+        match $lhs.checked_div($rhs) {
+            Some(value) => value,
+            None => {
+                return Err(EvaluateError::AttemptToDivideByZero);
+            }
+        }
+    };
+}
+
 macro_rules! normalize_numeric_operation {
+    ($lhs:tt / $rhs:ident) => {
+        match ($lhs, $rhs) {
+            (NumericObject::I32(lhs), NumericObject::I32(rhs)) => Ok(NumericObject::I32(check_div_or_err!(lhs, rhs))),
+            (NumericObject::F32(lhs), NumericObject::F32(rhs)) => Ok(NumericObject::F32(lhs / rhs)),
+            (NumericObject::F32(lhs), NumericObject::I32(rhs)) => {
+                return Ok(NumericObject::F32(lhs / rhs as f32));
+            }
+            (NumericObject::I32(lhs), NumericObject::F32(rhs)) => {
+                return Ok(NumericObject::F32(lhs as f32 / rhs));
+            }
+        }
+    };
+
     ($lhs:ident $op:tt $rhs:ident) => {
         match ($lhs, $rhs) {
             (NumericObject::I32(lhs), NumericObject::I32(rhs)) => Ok(NumericObject::I32(lhs $op rhs)),
@@ -35,11 +59,15 @@ macro_rules! normalize_numeric_operation {
 pub enum EvaluateError {
     UnexpectedUnaryOperator,
     UnexpectedBinaryOperator,
+    AttemptToDivideByZero,
 }
 
 pub fn evaluate(expression_tree: ASTNode) {
-    let result = evaluate_expression(expression_tree).unwrap();
-    println!("{}", result);
+    let result = evaluate_expression(expression_tree);
+    match result {
+        Ok(value) => println!("{}", value),
+        Err(err) => println!("Evaluation error: {:?}", err),
+    }
 }
 
 fn evaluate_expression(expression_tree: ASTNode) -> Result<NumericObject, EvaluateError> {
@@ -57,36 +85,16 @@ fn evaluate_expression(expression_tree: ASTNode) -> Result<NumericObject, Evalua
             }
             _ => Err(EvaluateError::UnexpectedUnaryOperator),
         },
-        ASTNode::BinaryExpr { op, lhs, rhs } => match op {
-            Operator::Plus => {
-                let eval_lhs = evaluate_expression(*lhs).unwrap();
-                let eval_rhs = evaluate_expression(*rhs).unwrap();
+        ASTNode::BinaryExpr { op, lhs, rhs } => {
+            let lhs = evaluate_expression(*lhs).unwrap();
+            let rhs = evaluate_expression(*rhs).unwrap();
 
-                normalize_numeric_operation!(eval_lhs + eval_rhs)
-            }
-            Operator::Minus => {
-                let eval_lhs = evaluate_expression(*lhs).unwrap();
-                let eval_rhs = evaluate_expression(*rhs).unwrap();
-
-                normalize_numeric_operation!(eval_lhs - eval_rhs)
-            }
-            Operator::Multiplication => {
-                let eval_lhs = evaluate_expression(*lhs).unwrap();
-                let eval_rhs = evaluate_expression(*rhs).unwrap();
-
-                normalize_numeric_operation!(eval_lhs * eval_rhs)
-            }
-            Operator::Division => {
-                let eval_lhs = evaluate_expression(*lhs).unwrap();
-                let eval_rhs = evaluate_expression(*rhs).unwrap();
-
-                normalize_numeric_operation!(eval_lhs / eval_rhs)
-            }
-            Operator::Exponential => {
-                let eval_lhs = evaluate_expression(*lhs).unwrap();
-                let eval_rhs = evaluate_expression(*rhs).unwrap();
-
-                match (eval_lhs, eval_rhs) {
+            match op {
+                Operator::Plus => normalize_numeric_operation!(lhs + rhs),
+                Operator::Minus => normalize_numeric_operation!(lhs - rhs),
+                Operator::Multiplication => normalize_numeric_operation!(lhs * rhs),
+                Operator::Division => normalize_numeric_operation!(lhs / rhs),
+                Operator::Exponential => match (lhs, rhs) {
                     (NumericObject::I32(lhs), NumericObject::I32(rhs)) => {
                         Ok(NumericObject::I32(lhs.pow(rhs as u32)))
                     }
@@ -99,9 +107,9 @@ fn evaluate_expression(expression_tree: ASTNode) -> Result<NumericObject, Evalua
                     (NumericObject::F32(lhs), NumericObject::I32(rhs)) => {
                         Ok(NumericObject::F32(lhs.powi(rhs)))
                     }
-                }
+                },
+                _ => Err(EvaluateError::UnexpectedBinaryOperator),
             }
-            _ => Err(EvaluateError::UnexpectedBinaryOperator),
-        },
+        }
     }
 }
