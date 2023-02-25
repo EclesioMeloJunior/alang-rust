@@ -110,8 +110,13 @@ fn parse_stmt(
 ) -> Result<(), ParserError> {
     match token_stream.last() {
         Some(current_tok) => match current_tok {
-            Token::I32(terminal_value) => {
-                operands_stack.push(ASTNode::I32(*terminal_value));
+            Token::F32(value) => {
+                operands_stack.push(ASTNode::F32(*value));
+                token_stream.pop().unwrap();
+                Ok(())
+            }
+            Token::I32(value) => {
+                operands_stack.push(ASTNode::I32(*value));
                 token_stream.pop().unwrap();
                 Ok(())
             }

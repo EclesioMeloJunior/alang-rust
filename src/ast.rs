@@ -59,6 +59,7 @@ impl PartialOrd for Operator {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ASTNode {
     I32(i32),
+    F32(f32),
     UnaryExpr {
         op: Operator,
         inner: Box<ASTNode>,
