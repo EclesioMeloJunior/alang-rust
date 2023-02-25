@@ -17,6 +17,7 @@ fn start_repl() {
         if bytes_read > 0 {
             match lexer::extract_token_stream(line) {
                 Ok(tokens) => {
+                    println!("{:?}", tokens);
                     let exp_tree = parser::parse(tokens).unwrap();
                     eval::evaluate(exp_tree);
                 }

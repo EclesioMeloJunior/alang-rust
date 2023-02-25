@@ -1,20 +1,8 @@
-use std::fmt;
+pub mod token;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Token {
-    F32(f32),
-    I32(i32),
-
-    Plus,
-    Minus,
-    Star,
-    Slash,
-
-    OpenParen,
-    CloseParen,
-
-    Caret,
-}
+use core::num;
+use std::{fmt, iter::Peekable, str::Chars};
+use token::Token;
 
 #[derive(Debug, Clone)]
 pub enum LexerError {
@@ -29,13 +17,57 @@ impl fmt::Display for LexerError {
     }
 }
 
+fn read_numeric(current: char, source: &mut Peekable<Chars>) -> String {
+    let mut numbers_in_seq = vec![current.to_string()];
+
+    let while_numbers_push = |sequence: &mut Vec<String>, source: &mut Peekable<Chars>| {
+        while let Some(current) = source.peek() {
+            if !current.is_numeric() {
+                break;
+            }
+
+            sequence.push(current.to_string());
+            source.next();
+        }
+    };
+
+    while_numbers_push(&mut numbers_in_seq, source);
+
+    if let Some(current) = source.peek() {
+        match current {
+            '.' => {
+                // adds the '.' to the sequence
+                numbers_in_seq.push(source.next().unwrap().to_string());
+                while_numbers_push(&mut numbers_in_seq, source);
+            }
+            _ => {}
+        }
+    }
+
+    numbers_in_seq.join("")
+}
+
+fn read_keyword_or_identifier(current: char, source: &mut Peekable<Chars>) -> Option<String> {
+    let mut sequence = vec![current];
+    while let Some(current) = source.peek() {
+        if !current.is_alphabetic() {
+            break;
+        }
+
+        sequence.push(source.next().unwrap());
+    }
+
+    Some(sequence.iter().collect())
+}
+
 pub fn extract_token_stream(line: String) -> Result<Vec<Token>, LexerError> {
-    let mut source_as_chars = line.chars().filter(|c| !c.is_whitespace()).peekable();
+    let mut source_as_chars = line.chars().peekable();
 
     let mut tokens: Vec<Token> = vec![];
 
     while let Some(current) = source_as_chars.next() {
         match current {
+            ' ' | '\n' | '\r' => continue,
             '+' => tokens.push(Token::Plus),
             '-' => tokens.push(Token::Minus),
             '*' => tokens.push(Token::Star),
@@ -43,45 +75,23 @@ pub fn extract_token_stream(line: String) -> Result<Vec<Token>, LexerError> {
             '(' => tokens.push(Token::OpenParen),
             ')' => tokens.push(Token::CloseParen),
             '^' => tokens.push(Token::Caret),
+            '=' => tokens.push(Token::Assign),
             _ => {
                 if current.is_numeric() {
-                    let mut numbers_in_seq = vec![current.to_string()];
-                    while let Some(current) = source_as_chars.peek() {
-                        if current.is_numeric() {
-                            numbers_in_seq.push(current.to_string());
-                            source_as_chars.next();
-                        } else {
-                            break;
-                        }
+                    let numeric_sequence = read_numeric(current, &mut source_as_chars);
+                    match numeric_sequence.contains(".") {
+                        true => tokens.push(Token::F32(numeric_sequence.parse::<f32>().unwrap())),
+                        false => tokens.push(Token::I32(numeric_sequence.parse::<i32>().unwrap())),
                     }
+                    continue;
+                }
 
-                    if let Some(current) = source_as_chars.peek() {
-                        match *current {
-                            '.' => {
-                                numbers_in_seq.push(source_as_chars.next().unwrap().to_string());
-
-                                // we expect more digitis after the dot
-                                while let Some(current) = source_as_chars.peek() {
-                                    if current.is_numeric() {
-                                        numbers_in_seq.push(current.to_string());
-                                        source_as_chars.next();
-                                    } else {
-                                        break;
-                                    }
-                                }
-
-                                let numbers_in_seq = numbers_in_seq.join("");
-                                tokens.push(Token::F32(numbers_in_seq.parse::<f32>().unwrap()));
-                                continue;
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    let numbers_in_seq = numbers_in_seq.join("");
-                    tokens.push(Token::I32(numbers_in_seq.parse::<i32>().unwrap()));
-                } else {
-                    return Err(LexerError::InvalidInputChar(current.to_string()));
+                match read_keyword_or_identifier(current, &mut source_as_chars) {
+                    Some(value) => match value.as_ref() {
+                        "let" => tokens.push(Token::Let),
+                        _ => tokens.push(Token::Ident(value.clone())),
+                    },
+                    None => return Err(LexerError::InvalidInputChar(current.to_string())),
                 }
             }
         };
@@ -104,6 +114,7 @@ mod tests {
             "(5 + 5)",
             "2 ^ 2",
             "10.0",
+            "let a = 1",
         ];
         let expectations: Vec<Vec<Token>> = vec![
             vec![Token::I32(1), Token::Plus, Token::I32(1)],
@@ -131,6 +142,12 @@ mod tests {
             ],
             vec![Token::I32(2), Token::Caret, Token::I32(2)],
             vec![Token::F32(10.0)],
+            vec![
+                Token::Let,
+                Token::Ident("a".into()),
+                Token::Assign,
+                Token::I32(1),
+            ],
         ];
 
         for idx in 0..tests.len() {

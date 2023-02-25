@@ -1,6 +1,6 @@
 use std::cmp::{Ordering, PartialOrd};
 
-use crate::lexer::Token;
+use crate::lexer::token::Token;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Operator {
     Sentinel,
@@ -11,19 +11,22 @@ pub enum Operator {
 
     Negative,
     Exponential,
+
+    Assign,
 }
 
 pub struct NotAnOperatorError(Token);
-impl TryFrom<Token> for Operator {
+impl TryFrom<&Token> for Operator {
     type Error = NotAnOperatorError;
-    fn try_from(value: Token) -> Result<Self, Self::Error> {
+    fn try_from(value: &Token) -> Result<Self, Self::Error> {
         match value {
+            Token::Assign => Ok(Operator::Assign),
             Token::Plus => Ok(Operator::Plus),
             Token::Minus => Ok(Operator::Minus),
             Token::Star => Ok(Operator::Multiplication),
             Token::Slash => Ok(Operator::Division),
             Token::Caret => Ok(Operator::Exponential),
-            _ => Err(NotAnOperatorError(value)),
+            _ => Err(NotAnOperatorError(value.clone())),
         }
     }
 }
@@ -31,6 +34,11 @@ impl TryFrom<Token> for Operator {
 impl PartialOrd for Operator {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         let ordering = match self {
+            Operator::Assign => match other {
+                Operator::Sentinel => Ordering::Greater,
+                Operator::Assign => Ordering::Equal,
+                _ => Ordering::Less,
+            },
             Operator::Plus | Operator::Minus => match other {
                 Operator::Sentinel => Ordering::Greater,
                 Operator::Multiplication
@@ -58,6 +66,7 @@ impl PartialOrd for Operator {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ASTNode {
+    Ident(String),
     I32(i32),
     F32(f32),
     UnaryExpr {

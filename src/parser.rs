@@ -1,24 +1,24 @@
 use crate::ast::{ASTNode, Operator};
-use crate::lexer::Token;
+use crate::lexer::token::Token;
 use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum ParserError {
-    UnexpectedEnd,
     ExpectedClosingParent,
     UnexpectedToken(Token),
     TokenStreamNotEmpty,
     FailedToParseAllOperators,
+    ExpectedIdentifier,
 }
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParserError::UnexpectedEnd => write!(f, "unexpected end"),
             ParserError::ExpectedClosingParent => write!(f, "expected closing parent"),
             ParserError::UnexpectedToken(t) => write!(f, "unexpected token: {:?}", t),
             ParserError::TokenStreamNotEmpty => write!(f, "token stream not empty"),
             ParserError::FailedToParseAllOperators => write!(f, "failed to parse all operators"),
+            ParserError::ExpectedIdentifier => write!(f, "expected variable identifier"),
         }
     }
 }
@@ -27,7 +27,7 @@ impl fmt::Display for ParserError {
  * The grammar
  *
  * E --> P {B P}
- * P --> v | "(" E ")" | U P
+ * P --> v | "=" P | "(" E ")" | U P
  * B --> "+" | "-" | "*" | "/"
  * U --> "-"
  *
@@ -70,10 +70,15 @@ fn parse_expression(
                 // when we reach a closing parent we just return since
                 // it is possible we are inside an open paren iteration
                 Token::CloseParen => break,
-                Token::Plus | Token::Minus | Token::Star | Token::Slash | Token::Caret => {
-                    let operator = match Operator::try_from(*next_tok) {
+                Token::Plus
+                | Token::Minus
+                | Token::Star
+                | Token::Slash
+                | Token::Caret
+                | Token::Assign => {
+                    let operator = match Operator::try_from(next_tok) {
                         Ok(operator) => operator,
-                        _ => return Err(ParserError::UnexpectedToken(*next_tok)),
+                        _ => return Err(ParserError::UnexpectedToken(next_tok.clone())),
                     };
 
                     push_operator(operator, operators_stack, operands_stack);
@@ -110,6 +115,26 @@ fn parse_stmt(
 ) -> Result<(), ParserError> {
     match token_stream.last() {
         Some(current_tok) => match current_tok {
+            Token::Let => {
+                // remove Token::Let from the token stream
+                token_stream.pop().unwrap();
+
+                // the next token should be an identifier otherwise raise an error
+                match token_stream.pop().unwrap() {
+                    Token::Ident(identifier) => {
+                        operands_stack.push(ASTNode::Ident(identifier.clone()));
+                    }
+                    _ => return Err(ParserError::ExpectedIdentifier),
+                }
+                Ok(())
+            }
+
+            Token::Ident(identifier) => {
+                operands_stack.push(ASTNode::Ident(identifier.clone()));
+                token_stream.pop().unwrap();
+
+                Ok(())
+            }
             Token::F32(value) => {
                 operands_stack.push(ASTNode::F32(*value));
                 token_stream.pop().unwrap();
@@ -144,9 +169,9 @@ fn parse_stmt(
                 parse_stmt(token_stream, operators_stack, operands_stack)?;
                 Ok(())
             }
-            _ => Err(ParserError::UnexpectedToken(*current_tok)),
+            _ => Err(ParserError::UnexpectedToken(current_tok.clone())),
         },
-        None => Err(ParserError::UnexpectedEnd),
+        None => Ok(()),
     }
 }
 
@@ -212,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_parser() {
-        use crate::lexer::Token;
+        use crate::lexer::token::Token;
         let tokens_tests: Vec<Vec<Token>> = vec![
             vec![Token::I32(1), Token::Plus, Token::I32(1)],
             vec![

@@ -1,8 +1,11 @@
-use crate::ast::{ASTNode, Operator};
+use std::collections::{hash_map::Entry, HashMap};
 use std::fmt;
+
+use crate::ast::{ASTNode, Operator};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NumericObject {
+    Declared,
     I32(i32),
     F32(f32),
 }
@@ -12,6 +15,7 @@ impl fmt::Display for NumericObject {
         match self {
             NumericObject::F32(value) => write!(f, "{}", value),
             NumericObject::I32(value) => write!(f, "{}", value),
+            NumericObject::Declared => write!(f, ""),
         }
     }
 }
@@ -38,6 +42,7 @@ macro_rules! normalize_numeric_operation {
             (NumericObject::I32(lhs), NumericObject::F32(rhs)) => {
                 return Ok(NumericObject::F32(lhs as f32 / rhs));
             }
+            _ => return Err(EvaluateError::VariableDoesNotHaveAValue)
         }
     };
 
@@ -51,43 +56,58 @@ macro_rules! normalize_numeric_operation {
             (NumericObject::I32(lhs), NumericObject::F32(rhs)) => {
                 return Ok(NumericObject::F32(lhs as f32 $op rhs));
             }
+            _ => return Err(EvaluateError::VariableDoesNotHaveAValue)
         }
     };
 }
 
 #[derive(Debug)]
 pub enum EvaluateError {
+    VariableDoesNotHaveAValue,
     UnexpectedUnaryOperator,
     UnexpectedBinaryOperator,
     AttemptToDivideByZero,
+    IdentifierVacant,
 }
 
 pub fn evaluate(expression_tree: ASTNode) {
-    let result = evaluate_expression(expression_tree);
+    let mut evaluation_env: HashMap<String, NumericObject> = HashMap::new();
+
+    let result = evaluate_expression(expression_tree, &mut evaluation_env);
     match result {
         Ok(value) => println!("{}", value),
         Err(err) => println!("Evaluation error: {:?}", err),
     }
 }
 
-fn evaluate_expression(expression_tree: ASTNode) -> Result<NumericObject, EvaluateError> {
+fn evaluate_expression(
+    expression_tree: ASTNode,
+    evaluation_env: &mut HashMap<String, NumericObject>,
+) -> Result<NumericObject, EvaluateError> {
     match expression_tree {
+        ASTNode::Ident(identifier) => match evaluation_env.entry(identifier) {
+            Entry::Occupied(value) => Ok(value.get().to_owned()),
+            Entry::Vacant(e) => Ok(e.insert(NumericObject::Declared).to_owned()),
+        },
         ASTNode::I32(value) => Ok(NumericObject::I32(value)),
         ASTNode::F32(value) => Ok(NumericObject::F32(value)),
         ASTNode::UnaryExpr { op, inner } => match op {
             Operator::Negative => {
-                let evaluated_object = evaluate_expression(*inner).unwrap();
+                let evaluated_object = evaluate_expression(*inner, evaluation_env).unwrap();
                 let negative = match evaluated_object {
                     NumericObject::F32(value) => NumericObject::F32(-value),
                     NumericObject::I32(value) => NumericObject::I32(-value),
+                    NumericObject::Declared => {
+                        return Err(EvaluateError::VariableDoesNotHaveAValue)
+                    }
                 };
                 Ok(negative)
             }
             _ => Err(EvaluateError::UnexpectedUnaryOperator),
         },
         ASTNode::BinaryExpr { op, lhs, rhs } => {
-            let lhs = evaluate_expression(*lhs).unwrap();
-            let rhs = evaluate_expression(*rhs).unwrap();
+            let lhs = evaluate_expression(*lhs, evaluation_env).unwrap();
+            let rhs = evaluate_expression(*rhs, evaluation_env).unwrap();
 
             match op {
                 Operator::Plus => normalize_numeric_operation!(lhs + rhs),
@@ -95,6 +115,10 @@ fn evaluate_expression(expression_tree: ASTNode) -> Result<NumericObject, Evalua
                 Operator::Multiplication => normalize_numeric_operation!(lhs * rhs),
                 Operator::Division => normalize_numeric_operation!(lhs / rhs),
                 Operator::Exponential => match (lhs, rhs) {
+                    (NumericObject::Declared, _) | (_, NumericObject::Declared) => {
+                        return Err(EvaluateError::VariableDoesNotHaveAValue)
+                    }
+
                     (NumericObject::I32(lhs), NumericObject::I32(rhs)) => {
                         Ok(NumericObject::I32(lhs.pow(rhs as u32)))
                     }
