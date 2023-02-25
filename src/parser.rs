@@ -204,7 +204,8 @@ fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<AS
             | Operator::Minus
             | Operator::Multiplication
             | Operator::Division
-            | Operator::Exponential => {
+            | Operator::Exponential
+            | Operator::Assign => {
                 let rhs = operands_stack.pop().unwrap();
                 let lhs = operands_stack.pop().unwrap();
 

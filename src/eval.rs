@@ -15,7 +15,7 @@ impl fmt::Display for NumericObject {
         match self {
             NumericObject::F32(value) => write!(f, "{}", value),
             NumericObject::I32(value) => write!(f, "{}", value),
-            NumericObject::Declared => write!(f, ""),
+            NumericObject::Declared => Ok(()),
         }
     }
 }
@@ -67,15 +67,17 @@ pub enum EvaluateError {
     UnexpectedUnaryOperator,
     UnexpectedBinaryOperator,
     AttemptToDivideByZero,
-    IdentifierVacant,
+    ExpectedIdentifier,
+    ErrUninitializedVariable,
 }
 
-pub fn evaluate(expression_tree: ASTNode) {
-    let mut evaluation_env: HashMap<String, NumericObject> = HashMap::new();
-
-    let result = evaluate_expression(expression_tree, &mut evaluation_env);
+pub fn evaluate(expression_tree: ASTNode, evaluation_env: &mut HashMap<String, NumericObject>) {
+    let result = evaluate_expression(expression_tree, evaluation_env);
     match result {
-        Ok(value) => println!("{}", value),
+        Ok(numeric_object_value) => match numeric_object_value {
+            NumericObject::Declared => {}
+            _ => println!("{}", numeric_object_value),
+        },
         Err(err) => println!("Evaluation error: {:?}", err),
     }
 }
@@ -85,9 +87,9 @@ fn evaluate_expression(
     evaluation_env: &mut HashMap<String, NumericObject>,
 ) -> Result<NumericObject, EvaluateError> {
     match expression_tree {
-        ASTNode::Ident(identifier) => match evaluation_env.entry(identifier) {
-            Entry::Occupied(value) => Ok(value.get().to_owned()),
-            Entry::Vacant(e) => Ok(e.insert(NumericObject::Declared).to_owned()),
+        ASTNode::Ident(identifier) => match evaluation_env.get(&identifier) {
+            Some(value) => Ok(value.to_owned()),
+            None => Err(EvaluateError::ErrUninitializedVariable),
         },
         ASTNode::I32(value) => Ok(NumericObject::I32(value)),
         ASTNode::F32(value) => Ok(NumericObject::F32(value)),
@@ -106,6 +108,18 @@ fn evaluate_expression(
             _ => Err(EvaluateError::UnexpectedUnaryOperator),
         },
         ASTNode::BinaryExpr { op, lhs, rhs } => {
+            match op {
+                Operator::Assign => match lhs.as_ref() {
+                    ASTNode::Ident(value) => {
+                        let rhs = evaluate_expression(*rhs, evaluation_env).unwrap();
+                        evaluation_env.insert(value.clone(), rhs);
+                        return Ok(NumericObject::Declared);
+                    }
+                    _ => return Err(EvaluateError::ExpectedIdentifier),
+                },
+                _ => {}
+            }
+
             let lhs = evaluate_expression(*lhs, evaluation_env).unwrap();
             let rhs = evaluate_expression(*rhs, evaluation_env).unwrap();
 
