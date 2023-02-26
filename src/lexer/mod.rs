@@ -114,6 +114,8 @@ mod tests {
             "(5 + 5)",
             "2 ^ 2",
             "10.0",
+            "let",
+            "a",
             "let a = 1",
         ];
         let expectations: Vec<Vec<Token>> = vec![
@@ -142,6 +144,8 @@ mod tests {
             ],
             vec![Token::I32(2), Token::Caret, Token::I32(2)],
             vec![Token::F32(10.0)],
+            vec![Token::Let],
+            vec![Token::Ident("a".into())],
             vec![
                 Token::Let,
                 Token::Ident("a".into()),
