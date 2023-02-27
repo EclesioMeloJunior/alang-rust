@@ -100,6 +100,7 @@ pub fn extract_token_stream(line: String) -> Result<Vec<Token>, LexerError> {
     Ok(tokens)
 }
 
+#[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
     use super::{extract_token_stream, Token};

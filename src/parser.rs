@@ -229,6 +229,7 @@ fn pop_operator(operators_stack: &mut Vec<Operator>, operands_stack: &mut Vec<AS
     }
 }
 
+#[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
     use crate::{
